@@ -1,0 +1,364 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Study Batting Game (German Vocab)</title>
+  <style>
+    :root { --bg:#0a1020; --panel:#121a2e; --border:#263453; --accent:#00d08f; --danger:#ef4444; --ok:#22c55e; --text:#e5e7eb; }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#0a1020 0%, #0b1326 100%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;background:#0b1020;border-bottom:1px solid #1f2942;position:sticky;top:0;z-index:10}
+    header h1{font-size:18px;margin:0}
+    .btn{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer}
+    .btn:hover{border-color:#3a4c78}
+    .btn.primary{background:linear-gradient(90deg,#1f6feb,#00d08f);color:#06111b;border:none}
+    .layout{display:grid;grid-template-columns:280px 1fr 280px;gap:12px;padding:12px}
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+    .stat{display:flex;justify-content:space-between;font-size:12px;margin-top:6px}
+    .meter{height:12px;background:#1f2942;border-radius:8px;overflow:hidden}
+    .meter > div{height:100%;background:linear-gradient(90deg,#f59e0b,#fde047);width:0%}
+
+    /* Pitch */
+    .pitch{position:relative;min-height:380px;background:linear-gradient(180deg,#0e1832, #0c1427);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    .crease{position:absolute;left:50%;top:55%;transform:translateX(-50%);width:70%;height:2px;background:#6ea8ff;opacity:.5}
+    .bat{position:absolute;left:50%;bottom:60px;transform:translateX(-50%) rotate(-10deg);width:100px;height:14px;background:linear-gradient(#b58a50,#8b6a3b);border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+    .ball{position:absolute;left:20px;top:40px;width:14px;height:14px;border-radius:50%;background:#ff4d4d;box-shadow:0 0 10px #ff4d4d}
+    .shot{position:absolute;left:54%;top:54%;width:8px;height:8px;border-radius:50%;background:#ffd54a;box-shadow:0 0 8px #ffd54a}
+
+    .question{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px}
+    .q-text{font-weight:600;margin-bottom:8px}
+    .choices{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .choice{padding:10px;border:1px solid #334063;border-radius:8px;background:#0f162b;cursor:pointer;color:#ffffff}
+    .choice.correct{border-color:#4ade80;background:#0b1a12;color:#ffffff}
+    .choice.wrong{border-color:#ef4444;background:#1a0b0b;color:#ffffff}
+    .input-row{display:flex;gap:8px;margin-top:8px}
+    input[type=text]{flex:1;background:#0f162b;color:#ffffff;border:1px solid #334063;border-radius:8px;padding:10px}
+
+    .log{font-size:12px;line-height:1.4;max-height:260px;overflow:auto}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #334063;background:#12203d;margin-right:6px}
+
+    .settings{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
+    .modal{width:min(760px,92vw);background:#0b1020;border:1px solid var(--border);border-radius:12px;padding:16px}
+    .modal h3{margin-top:0}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Study Batting Game — German Vocab</h1>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn primary" id="startBtn">Start Game</button>
+      <button class="btn" id="resetBtn">Reset</button>
+      <button class="btn" id="settingsBtn">Vocabulary & Settings</button>
+      <label class="badge"><input type="checkbox" id="textMode"> Text-input mode</label>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Scoreboard -->
+    <section class="panel">
+      <h3>Scoreboard</h3>
+      <div class="stat"><span>Runs</span><strong id="runs">0</strong></div>
+      <div class="stat"><span>Wickets</span><strong id="wickets">0</strong></div>
+      <div class="stat"><span>Balls</span><strong id="balls">0 (0.0 ov)</strong></div>
+      <div class="stat"><span>Strike Rate</span><strong id="sr">0.0</strong></div>
+      <div class="stat"><span>Streak</span><strong id="streak">0</strong></div>
+      <div class="stat"><span>Batting Meter</span><div class="meter"><div id="meterBar"></div></div></div>
+      <p style="font-size:12px;color:#9aa7c7">Correct = runs (1/2/3/4/6). Wrong = wicket. Innings ends at 3 wickets.</p>
+    </section>
+
+    <!-- Pitch Area -->
+    <main class="pitch" id="pitch">
+      <div class="crease"></div>
+      <div class="bat" id="bat"></div>
+      <div class="ball" id="ball"></div>
+      <div class="question" id="questionBox">
+        <div class="q-text" id="qText">Press <strong>Start Game</strong> to begin!</div>
+        <div class="choices" id="choices"></div>
+        <div class="input-row" id="inputRow" style="display:none">
+          <input type="text" id="textAnswer" placeholder="Type your answer…">
+          <button class="btn" id="submitText">Submit</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Commentary -->
+    <section class="panel">
+      <h3>Commentary</h3>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="settings" id="settings">
+    <div class="modal">
+      <h3>Vocabulary & Settings</h3>
+      <p>Edit or paste custom vocab JSON (array of {prompt, answer, type}).</p>
+      <textarea id="vocabArea" style="width:100%;height:220px;background:#0f162b;color:#e5e7eb;border:1px solid #334063;border-radius:8px;padding:8px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" id="applyVocab">Apply</button>
+        <button class="btn" id="closeSettings">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------- DATA (Merged Quizlet) ----------------------
+    const DEFAULT_VOCAB = [
+      {prompt:"Do you have a pet?", answer:"Hast du ein Haustier?", type:"EN2DE"},
+      {prompt:"Hast du ein Haustier?", answer:"Do you have a pet?", type:"DE2EN"},
+      {prompt:"I have...", answer:"Ich habe ...", type:"EN2DE"},
+      {prompt:"Ich habe ...", answer:"I have...", type:"DE2EN"},
+      {prompt:"a dog", answer:"einen Hund", type:"EN2DE"},{prompt:"einen Hund", answer:"a dog", type:"DE2EN"},
+      {prompt:"a cat", answer:"eine Katze", type:"EN2DE"},{prompt:"eine Katze", answer:"a cat", type:"DE2EN"},
+      {prompt:"a rabbit", answer:"ein Kaninchen", type:"EN2DE"},{prompt:"ein Kaninchen", answer:"a rabbit", type:"DE2EN"},
+      {prompt:"a guinea pig", answer:"ein Meerschweinchen", type:"EN2DE"},{prompt:"ein Meerschweinchen", answer:"a guinea pig", type:"DE2EN"},
+      {prompt:"a horse", answer:"ein Pferd", type:"EN2DE"},{prompt:"ein Pferd", answer:"a horse", type:"DE2EN"},
+      {prompt:"a snake", answer:"eine Schlange", type:"EN2DE"},{prompt:"eine Schlange", answer:"a snake", type:"DE2EN"},
+      {prompt:"dogs", answer:"Hunde", type:"EN2DE"},{prompt:"Hunde", answer:"dogs", type:"DE2EN"},
+      {prompt:"cats", answer:"Katzen", type:"EN2DE"},{prompt:"Katzen", answer:"cats", type:"DE2EN"},
+      {prompt:"rabbits", answer:"Kaninchen", type:"EN2DE"},{prompt:"Kaninchen", answer:"rabbits", type:"DE2EN"},
+      {prompt:"mice", answer:"Mäuse", type:"EN2DE"},{prompt:"Mäuse", answer:"mice", type:"DE2EN"},
+      {prompt:"guinea pigs", answer:"Meerschweinchen", type:"EN2DE"},{prompt:"Meerschweinchen", answer:"guinea pigs", type:"DE2EN"},
+      {prompt:"horses", answer:"Pferde", type:"EN2DE"},{prompt:"Pferde", answer:"horses", type:"DE2EN"},
+      {prompt:"snakes", answer:"Schlangen", type:"EN2DE"},{prompt:"Schlangen", answer:"snakes", type:"DE2EN"},
+      {prompt:"friendly", answer:"freundlich", type:"EN2DE"},{prompt:"freundlich", answer:"friendly", type:"DE2EN"},
+      {prompt:"lazy", answer:"faul", type:"EN2DE"},{prompt:"faul", answer:"lazy", type:"DE2EN"},
+      {prompt:"sporty", answer:"sportlich", type:"EN2DE"},{prompt:"sportlich", answer:"sporty", type:"DE2EN"},
+      {prompt:"sweet / cute", answer:"süß", type:"EN2DE"},{prompt:"süß", answer:"sweet / cute", type:"DE2EN"},
+      {prompt:"black", answer:"schwarz", type:"EN2DE"},{prompt:"schwarz", answer:"black", type:"DE2EN"},
+      {prompt:"white", answer:"weiß", type:"EN2DE"},{prompt:"weiß", answer:"white", type:"DE2EN"},
+      {prompt:"grey", answer:"grau", type:"EN2DE"},{prompt:"grau", answer:"grey", type:"DE2EN"},
+      {prompt:"brown", answer:"braun", type:"EN2DE"},{prompt:"braun", answer:"brown", type:"DE2EN"},
+      {prompt:"red", answer:"rot", type:"EN2DE"},{prompt:"rot", answer:"red", type:"DE2EN"},
+      {prompt:"yellow", answer:"gelb", type:"EN2DE"},{prompt:"gelb", answer:"yellow", type:"DE2EN"},
+      {prompt:"green", answer:"grün", type:"EN2DE"},{prompt:"grün", answer:"green", type:"DE2EN"},
+      {prompt:"blue", answer:"blau", type:"EN2DE"},{prompt:"blau", answer:"blue", type:"DE2EN"},
+      {prompt:"indigo", answer:"indigoblau", type:"EN2DE"},{prompt:"indigoblau", answer:"indigo", type:"DE2EN"},
+      {prompt:"violet", answer:"violett", type:"EN2DE"},{prompt:"violett", answer:"violet", type:"DE2EN"},
+      {prompt:"purple", answer:"lila", type:"EN2DE"},{prompt:"lila", answer:"purple", type:"DE2EN"},
+      {prompt:"pink", answer:"rosa", type:"EN2DE"},{prompt:"rosa", answer:"pink", type:"DE2EN"},
+      {prompt:"black hair", answer:"schwarze Haare", type:"EN2DE"},{prompt:"schwarze Haare", answer:"black hair", type:"DE2EN"},
+      {prompt:"brown hair", answer:"braune Haare", type:"EN2DE"},{prompt:"braune Haare", answer:"brown hair", type:"DE2EN"},
+      {prompt:"blond hair", answer:"blonde Haare", type:"EN2DE"},{prompt:"blonde Haare", answer:"blond hair", type:"DE2EN"},
+      {prompt:"red hair", answer:"rote Haare", type:"EN2DE"},{prompt:"rote Haare", answer:"red hair", type:"DE2EN"},
+      {prompt:"long hair", answer:"lange Haare", type:"EN2DE"},{prompt:"lange Haare", answer:"long hair", type:"DE2EN"},
+      {prompt:"short hair", answer:"kurze Haare", type:"EN2DE"},{prompt:"kurze Haare", answer:"short hair", type:"DE2EN"},
+      {prompt:"mid-length hair", answer:"mittellange Haare", type:"EN2DE"},{prompt:"mittellange Haare", answer:"mid-length hair", type:"DE2EN"},
+      {prompt:"blue eyes", answer:"blaue Augen", type:"EN2DE"},{prompt:"blaue Augen", answer:"blue eyes", type:"DE2EN"},
+      {prompt:"brown eyes", answer:"braune Augen", type:"EN2DE"},{prompt:"braune Augen", answer:"brown eyes", type:"DE2EN"},
+      {prompt:"green eyes", answer:"grüne Augen", type:"EN2DE"},{prompt:"grüne Augen", answer:"green eyes", type:"DE2EN"},
+      {prompt:"grey eyes", answer:"graue Augen", type:"EN2DE"},{prompt:"graue Augen", answer:"grey eyes", type:"DE2EN"},
+      {prompt:"January", answer:"Januar", type:"EN2DE"},{prompt:"Januar", answer:"January", type:"DE2EN"},
+      {prompt:"February", answer:"Februar", type:"EN2DE"},{prompt:"Februar", answer:"February", type:"DE2EN"}
+    ];
+
+    let VOCAB = [...DEFAULT_VOCAB];
+
+    // ---------------------- STATE ----------------------
+    const state = {
+      runs: 0,
+      wickets: 0,
+      balls: 0,
+      streak: 0,
+      running: false,
+      textMode: false
+    };
+
+    const els = {};
+
+    // Wrap everything to ensure Start button works even if scripts load early
+    document.addEventListener('DOMContentLoaded', ()=>{
+      // Cache elements
+      Object.assign(els, {
+        startBtn: document.getElementById('startBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        settingsBtn: document.getElementById('settingsBtn'),
+        textModeToggle: document.getElementById('textMode'),
+        runs: document.getElementById('runs'),
+        wickets: document.getElementById('wickets'),
+        balls: document.getElementById('balls'),
+        sr: document.getElementById('sr'),
+        streak: document.getElementById('streak'),
+        meterBar: document.getElementById('meterBar'),
+        bat: document.getElementById('bat'),
+        ball: document.getElementById('ball'),
+        qText: document.getElementById('qText'),
+        choices: document.getElementById('choices'),
+        inputRow: document.getElementById('inputRow'),
+        textAnswer: document.getElementById('textAnswer'),
+        submitText: document.getElementById('submitText'),
+        log: document.getElementById('log'),
+        settings: document.getElementById('settings'),
+        vocabArea: document.getElementById('vocabArea'),
+        applyVocab: document.getElementById('applyVocab'),
+        closeSettings: document.getElementById('closeSettings'),
+      });
+
+      // Bind events
+      els.startBtn.addEventListener('click', startGame);
+      els.resetBtn.addEventListener('click', resetGame);
+      els.settingsBtn.addEventListener('click', openSettings);
+      els.closeSettings.addEventListener('click', ()=> els.settings.style.display='none');
+      els.applyVocab.addEventListener('click', applyVocab);
+      els.submitText.addEventListener('click', ()=> submitAnswer(els.textAnswer.value));
+      els.textModeToggle.addEventListener('change', ()=>{ state.textMode = els.textModeToggle.checked; renderInputMode(); });
+
+      // Load saved vocab
+      const saved = localStorage.getItem('cr_vocab');
+      if(saved){ try{ const arr = JSON.parse(saved); if(Array.isArray(arr)&&arr.length) VOCAB = arr; }catch{} }
+
+      // Initial UI
+      updateScore();
+      renderInputMode();
+    });
+
+    // ---------------------- GAME LOGIC ----------------------
+    let currentQ = null;
+
+    function startGame(){
+      state.running = true;
+      state.runs = 0; state.wickets = 0; state.balls = 0; state.streak = 0;
+      updateScore();
+      els.log.innerHTML = '';
+      ask();
+    }
+
+    function resetGame(){
+      state.running = false;
+      state.runs = 0; state.wickets = 0; state.balls = 0; state.streak = 0;
+      updateScore();
+      els.qText.innerHTML = 'Press <strong>Start Game</strong> to begin!';
+      els.choices.innerHTML = '';
+      els.inputRow.style.display = 'none';
+    }
+
+    function openSettings(){
+      els.settings.style.display='flex';
+      els.vocabArea.value = JSON.stringify(VOCAB, null, 2);
+    }
+
+    function applyVocab(){
+      try{
+        const arr = JSON.parse(els.vocabArea.value);
+        if(Array.isArray(arr) && arr.length){ VOCAB = arr; localStorage.setItem('cr_vocab', JSON.stringify(arr)); els.settings.style.display='none'; }
+      }catch(err){ alert('Invalid JSON'); }
+    }
+
+    function renderInputMode(){
+      els.inputRow.style.display = state.textMode ? 'flex' : 'none';
+    }
+
+    function updateScore(){
+      els.runs.textContent = state.runs;
+      els.wickets.textContent = state.wickets;
+      const overs = Math.floor(state.balls/6) + '.' + (state.balls % 6);
+      els.balls.textContent = `${state.balls} (${overs} ov)`;
+      const sr = state.balls ? ((state.runs/state.balls)*100).toFixed(1) : '0.0';
+      els.sr.textContent = sr;
+      els.streak.textContent = state.streak;
+      const meter = Math.min(100, state.streak*10);
+      els.meterBar.style.width = meter + '%';
+    }
+
+    function randomQuestion(){
+      return VOCAB[Math.floor(Math.random()*VOCAB.length)];
+    }
+
+    function makeChoices(correct){
+      const pool = VOCAB.filter(x=>x!==correct);
+      const opts = [correct.answer];
+      while(opts.length<4 && pool.length){
+        const pick = pool.splice(Math.floor(Math.random()*pool.length),1)[0];
+        if(!opts.includes(pick.answer)) opts.push(pick.answer);
+      }
+      for(let i=opts.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[opts[i],opts[j]]=[opts[j],opts[i]]}
+      return opts;
+    }
+
+    function ask(){
+      if(!state.running) return;
+      currentQ = randomQuestion();
+      const dir = currentQ.type==='EN2DE' ? 'Translate to German' : 'Translate to English';
+      els.qText.innerHTML = `<span class="badge">${dir}</span> <strong>${currentQ.prompt}</strong>`;
+      els.choices.innerHTML = '';
+      if(state.textMode){
+        els.textAnswer.value = '';
+      } else {
+        const opts = makeChoices(currentQ);
+        opts.forEach(opt=>{
+          const b = document.createElement('button');
+          b.className = 'choice';
+          b.textContent = opt;
+          b.addEventListener('click', ()=> submitAnswer(opt));
+          els.choices.appendChild(b);
+        });
+      }
+      // Prepare ball position
+      els.ball.style.left = '20px';
+      els.ball.style.top = '40px';
+    }
+
+    function submitAnswer(value){
+      if(!state.running) return;
+      state.balls++;
+      const ok = normalize(value) === normalize(currentQ.answer);
+      playDelivery(ok);
+      if(ok){
+        state.streak++;
+        const runOptions = [1,2,3,4,6];
+        // Slight streak reward: higher chance for boundary when streak grows
+        const idx = Math.min(runOptions.length-1, Math.floor(Math.random()*runOptions.length + state.streak*0.2));
+        const runs = runOptions[Math.min(idx, runOptions.length-1)];
+        state.runs += runs;
+        addLog(`✅ Correct — ${runs} run(s)!`);
+      } else {
+        state.streak = 0;
+        state.wickets++;
+        addLog('❌ Wrong — OUT!');
+        if(state.wickets >= 3){
+          state.running = false;
+          addLog('🏁 Innings over. Final: ' + state.runs + '/' + state.wickets + ' in ' + state.balls + ' balls.');
+          els.qText.innerHTML = 'Innings over — press <strong>Start Game</strong> to play again.';
+          els.choices.innerHTML = '';
+          updateScore();
+          return;
+        }
+      }
+      updateScore();
+      ask();
+    }
+
+    function playDelivery(ok){
+      // simple ball flight then bat swing
+      const ball = els.ball; const bat = els.bat;
+      const startLeft = 20, startTop = 40; const hitLeft = 300, hitTop = 250;
+      ball.style.transition = 'transform 0.5s ease';
+      ball.style.transform = `translate(${hitLeft}px, ${hitTop}px)`;
+      setTimeout(()=>{
+        // Bat swing
+        bat.style.transition = 'transform 0.25s ease';
+        bat.style.transform = 'translateX(-50%) rotate(20deg)';
+        setTimeout(()=>{ bat.style.transform = 'translateX(-50%) rotate(-10deg)'; }, 220);
+        // Shot spark
+        const spark = document.createElement('div'); spark.className='shot';
+        spark.style.left = '54%'; spark.style.top = '54%';
+        document.getElementById('pitch').appendChild(spark);
+        setTimeout(()=> spark.remove(), 300);
+        // Reset ball
+        setTimeout(()=>{ ball.style.transition = 'none'; ball.style.transform = 'translate(0,0)'; }, 260);
+      }, 500);
+    }
+
+    function addLog(line){
+      const p = document.createElement('div'); p.textContent = line;
+      els.log.prepend(p);
+    }
+
+    function normalize(s){
+      return (s||'').toLowerCase().replace(/\s+/g,' ').trim();
+    }
+  </script>
+</body>
+</html>
